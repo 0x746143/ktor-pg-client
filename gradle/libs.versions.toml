@@ -1,0 +1,5 @@
+[versions]
+ktor-version = "3.0.3"
+
+[libraries]
+ktor-network = { group = "io.ktor", name = "ktor-network", version.ref = "ktor-version" }
