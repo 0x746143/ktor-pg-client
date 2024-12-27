@@ -13,6 +13,7 @@ dependencies {
     implementation(libs.ktor.network)
     implementation(libs.scram.client)
     testImplementation(kotlin("test"))
+    testImplementation(libs.mockk)
 }
 
 tasks.test {

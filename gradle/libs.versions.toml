@@ -1,7 +1,9 @@
 [versions]
 ktor-version = "3.0.3"
 scram-client-version = "3.1"
+mockk-version = "1.13.14"
 
 [libraries]
 ktor-network = { group = "io.ktor", name = "ktor-network", version.ref = "ktor-version" }
 scram-client = { group = "com.ongres.scram", name = "scram-client", version.ref = "scram-client-version"}
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk-version"}
