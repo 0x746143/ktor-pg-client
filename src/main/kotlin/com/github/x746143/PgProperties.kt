@@ -19,12 +19,20 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 data class PgProperties(
-    val host: String,
-    val port: Int,
-    val database: String,
-    val user: String,
-    val password: String,
+    val host: String = "localhost",
+    val port: Int = 5432,
+    override val username: String = "postgres",
+    override val password: String = "postgres",
+    override val database: String = username,
+    override val appName: String = "ktor-pg-client",
     val minPoolSize: Int = 10,
     val maxPoolSize: Int = 100,
     val timeout: Duration = 5.seconds
-)
+) : PgAuthProperties
+
+internal interface PgAuthProperties {
+    val database: String
+    val username: String
+    val password: String
+    val appName: String
+}

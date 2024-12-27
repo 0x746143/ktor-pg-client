@@ -15,9 +15,9 @@
  */
 package com.github.x746143
 
+import com.github.x746143.wire3.StartupHandler
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
-import io.ktor.utils.io.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.getOrElse
@@ -42,17 +42,14 @@ class PgClient(private val props: PgProperties) : PgConnection {
     }
 
     private suspend fun createConnection(): PgConnectionImpl {
-        val socket = socketBuilder.connect(props.host, props.port)
-        val readChannel = socket.openReadChannel()
-        val writeChannel = socket.openWriteChannel()
-        authenticate(readChannel, writeChannel)
-        return PgConnectionImpl(readChannel, writeChannel) {
+        val connection = socketBuilder.connect(props.host, props.port).connection()
+        with(StartupHandler(connection.input, connection.output, props)) {
+            sendStartupMessage()
+            authenticate()
+        }
+        return PgConnectionImpl(connection.input, connection.output) {
             releaseConnection(it)
         }
-    }
-
-    private suspend fun authenticate(readChannel: ByteReadChannel, writeChannel: ByteWriteChannel) {
-        TODO()
     }
 
     private suspend inline fun acquireConnection(): PgConnectionImpl = withTimeout(props.timeout) {
@@ -79,7 +76,7 @@ class PgClient(private val props: PgProperties) : PgConnection {
         }
     }
 
-    suspend fun transaction(block: (PgConnectionImpl) -> Unit) {
+    suspend fun transaction(block: (PgConnection) -> Unit) {
         return acquireConnection().use {
             block(it)
         }
