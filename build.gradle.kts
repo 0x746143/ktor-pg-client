@@ -11,6 +11,7 @@ repositories {
 
 dependencies {
     implementation(libs.ktor.network)
+    implementation(libs.scram.client)
     testImplementation(kotlin("test"))
 }
 
