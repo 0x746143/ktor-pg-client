@@ -53,8 +53,8 @@ internal fun Source.readCStringOrNull(): String? {
 }
 
 internal suspend inline fun ByteWriteChannel.writePgMessage(
-    flush: Boolean = true,
     identifier: Byte,
+    flush: Boolean = true,
     block: Buffer.() -> Unit
 ) {
     writeByte(identifier)
@@ -75,8 +75,8 @@ internal suspend inline fun ByteWriteChannel.writePgMessage(
 }
 
 internal suspend inline fun ByteWriteChannel.writePgMessage(
-    flush: Boolean = true,
-    identifier: Byte
+    identifier: Byte,
+    flush: Boolean = true
 ) {
     writeByte(identifier)
     writeInt(4)
