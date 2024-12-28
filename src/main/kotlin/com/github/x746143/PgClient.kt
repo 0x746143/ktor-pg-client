@@ -30,7 +30,7 @@ class PgClient(private val props: PgProperties) : PgConnection {
     private val socketBuilder = aSocket(selectorManager).tcp()
     private val connectionPool = Channel<PgConnectionImpl>(props.maxPoolSize)
     private val mutex = Mutex()
-    private var connectionCounter = 0
+    internal var connectionCounter = 0
 
     suspend fun initPool() {
         mutex.withLock {

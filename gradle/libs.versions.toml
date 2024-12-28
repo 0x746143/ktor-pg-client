@@ -2,8 +2,10 @@
 ktor-version = "3.0.3"
 scram-client-version = "3.1"
 mockk-version = "1.13.14"
+testcontainers-version = "1.20.4"
 
 [libraries]
 ktor-network = { group = "io.ktor", name = "ktor-network", version.ref = "ktor-version" }
-scram-client = { group = "com.ongres.scram", name = "scram-client", version.ref = "scram-client-version"}
-mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk-version"}
+scram-client = { group = "com.ongres.scram", name = "scram-client", version.ref = "scram-client-version" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk-version" }
+testcontainers-postgresql = { group = "org.testcontainers", name = "postgresql", version.ref = "testcontainers-version" }

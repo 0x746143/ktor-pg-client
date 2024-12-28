@@ -14,6 +14,8 @@ dependencies {
     implementation(libs.scram.client)
     testImplementation(kotlin("test"))
     testImplementation(libs.mockk)
+    testImplementation(libs.testcontainers.postgresql)
+
 }
 
 tasks.test {
