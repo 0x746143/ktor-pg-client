@@ -15,7 +15,7 @@
  */
 package com.github.x746143
 
-import com.github.x746143.wire3.StartupHandler
+import com.github.x746143.wire3.StartupAuthHandler
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +43,7 @@ class PgClient(private val props: PgProperties) : PgConnection {
 
     private suspend fun createConnection(): PgConnectionImpl {
         val connection = socketBuilder.connect(props.host, props.port).connection()
-        with(StartupHandler(connection.input, connection.output, props)) {
+        with(StartupAuthHandler(connection.input, connection.output, props)) {
             sendStartupMessage()
             authenticate()
         }

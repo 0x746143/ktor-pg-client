@@ -24,7 +24,7 @@ import kotlinx.io.readString
 import kotlinx.io.writeString
 
 // https://www.postgresql.org/docs/16/protocol-flow.html#PROTOCOL-FLOW-START-UP
-internal class StartupHandler(
+internal class StartupAuthHandler(
     private val input: ByteReadChannel,
     private val output: ByteWriteChannel,
     private val props: PgAuthProperties,

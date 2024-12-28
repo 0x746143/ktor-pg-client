@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
-class StartupHandlerTest {
+class StartupAuthHandlerTest {
 
     @Test
     fun testStartupMessage() = runBlocking {
@@ -36,7 +36,7 @@ class StartupHandlerTest {
             override val password = "password"
             override val appName = "test-app"
         }
-        StartupHandler(ByteChannel(), output, props).sendStartupMessage()
+        StartupAuthHandler(ByteChannel(), output, props).sendStartupMessage()
         output.close()
         val expected = """
             [00000064][00030000]
@@ -69,7 +69,7 @@ class StartupHandlerTest {
         }
 
         val job = launch {
-            StartupHandler(input, output, props, scramClient).authenticate()
+            StartupAuthHandler(input, output, props, scramClient).authenticate()
         }
 
         val authRequestSasl = """
