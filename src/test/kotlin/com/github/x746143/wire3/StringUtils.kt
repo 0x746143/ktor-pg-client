@@ -18,14 +18,15 @@ package com.github.x746143.wire3
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 
-fun String.mixedHexStringToByteArray(): ByteArray {
+fun String.mixedHexToByteArray(): ByteArray {
+    val str = trimIndent().replace("\n","")
     val buffer = Buffer()
     var hexMode = false
     var i = 0
-    while (i < length) {
-        val ch = this[i++]
+    while (i < str.length) {
+        val ch = str[i++]
         if (ch > '~') {
-            throw IllegalArgumentException("Invalid character $this at index $i")
+            throw IllegalArgumentException("Invalid character $str at index $i")
         }
         when (ch) {
             '[' -> { hexMode = true; continue }
@@ -33,7 +34,7 @@ fun String.mixedHexStringToByteArray(): ByteArray {
         }
         if (hexMode) {
             val highNibble = ch.hexToInt(i) shl 4
-            val lowNibble = this[i++].hexToInt(i)
+            val lowNibble = str[i++].hexToInt(i)
             buffer.writeByte((highNibble or lowNibble).toByte())
         } else {
             buffer.writeByte(ch.code.toByte())
