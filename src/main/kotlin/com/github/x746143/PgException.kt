@@ -15,7 +15,16 @@
  */
 package com.github.x746143
 
-import java.lang.Exception
-
-class PgException(message: String) : Exception(message) {
+class PgException(message: String, val severity: String? = null, val code: String? = null) : Exception() {
+    private val _message = message
+    override val message: String
+        get() = buildString {
+            if (severity != null) {
+                append(severity).append(" ")
+            }
+            if (code != null) {
+                append("[$code] ")
+            }
+            append(_message)
+        }
 }

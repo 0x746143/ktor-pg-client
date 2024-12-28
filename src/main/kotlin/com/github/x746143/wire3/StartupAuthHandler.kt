@@ -55,6 +55,11 @@ internal class StartupAuthHandler(
         private const val BACKEND_KEY_DATA_TYPE = 'K'.code.toByte()
         private const val READY_FOR_QUERY_TYPE = 'Z'.code.toByte()
         private const val SASL_RESPONSE_TYPE = 'p'.code.toByte()
+        private const val ERROR_RESPONSE_TYPE = 'E'.code.toByte()
+        private const val ZERO = 0.toByte()
+        private const val MESSAGE_ERROR_TYPE = 'M'.code.toByte()
+        private const val CODE_ERROR_TYPE = 'C'.code.toByte()
+        private const val SEVERITY_ERROR_TYPE = 'S'.code.toByte()
 
         val scramMechanisms = listOf("SCRAM-SHA-256", "SCRAM-SHA-256-PLUS")
         private val scramSha256 = scramMechanisms[0].toByteArray()
@@ -81,13 +86,25 @@ internal class StartupAuthHandler(
             val source = input.readPacket(messageLength - 4)
             when (messageType) {
                 AUTHENTICATION_TYPE -> authenticateScram(source)
+                // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-PARAMETERSTATUS
                 PARAMETER_STATUS_TYPE -> {} // TODO: handling
+                // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-BACKENDKEYDATA
                 BACKEND_KEY_DATA_TYPE -> {} // TODO: handling
-                READY_FOR_QUERY_TYPE -> return
-                else -> {
-                    println(source.readString())
-                    throw PgException("Unsupported message type: ${messageType.toInt().toChar()}")
+                // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-ERRORRESPONSE
+                ERROR_RESPONSE_TYPE -> {
+                    generateSequence {
+                        source.readByte().let { if (it == ZERO) null else it to source.readCString() }
+                    }.toMap().let { fields ->
+                        throw PgException(
+                            fields[MESSAGE_ERROR_TYPE] ?: "Unknown error",
+                            fields[SEVERITY_ERROR_TYPE],
+                            fields[CODE_ERROR_TYPE],
+                        )
+                    }
                 }
+                // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-READYFORQUERY
+                READY_FOR_QUERY_TYPE -> return
+                else -> throw PgException("Unsupported message type: ${messageType.toInt().toChar()}")
             }
         }
     }

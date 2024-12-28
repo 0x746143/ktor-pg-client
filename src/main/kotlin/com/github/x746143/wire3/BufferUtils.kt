@@ -44,12 +44,16 @@ internal fun Buffer.param(name: ByteArray, value: ByteArray) {
 }
 
 internal fun Source.readCString(): String {
-    return readString(indexOf(0))
+    val result = readString(indexOf(0))
+    readByte() // ignore zero byte
+    return result
 }
 
 internal fun Source.readCStringOrNull(): String? {
     val length = peek().indexOf(0)
-    return if (length.toInt() > 0) readString(length) else null
+    val result = if (length.toInt() > 0) readString(length) else null
+    readByte() // ignore zero byte
+    return result
 }
 
 internal suspend inline fun ByteWriteChannel.writePgMessage(
