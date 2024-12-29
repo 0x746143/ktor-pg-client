@@ -38,6 +38,7 @@ class StartupAuthHandlerTest {
     fun testStartupMessage() = runBlocking {
         StartupAuthHandler(input, output, props).sendStartupMessage()
         output.close()
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-STARTUPMESSAGE
         val expected = """
             [00000066][00030000]
             user[00]test-user[00]
@@ -51,7 +52,7 @@ class StartupAuthHandlerTest {
 
     @Timeout(1)
     @Test
-    fun testSuccessfulSaslAuthentication() = runBlocking {
+    fun testSaslAuthentication() = runBlocking {
         val scramClient = ScramClient.builder()
             .advertisedMechanisms(listOf("SCRAM-SHA-256", "SCRAM-SHA-256-PLUS"))
             .username(props.username)
@@ -63,10 +64,12 @@ class StartupAuthHandlerTest {
             StartupAuthHandler(input, output, props, scramClient).authenticate()
         }
 
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONSASL
         val authRequestSasl = "R[00000017][0000000a]SCRAM-SHA-256[00][00]".mixedHexToByteArray()
         input.writeByteArray(authRequestSasl)
 
         yield()
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-SASLINITIALRESPONSE
         val expectedSaslInitialResponse = """
             p[0000003f]SCRAM-SHA-256[00][00000029]
             n,,n=test-user,r=Zr_UEQW:@]US$3;>;OWTSOJF
@@ -74,6 +77,7 @@ class StartupAuthHandlerTest {
         val actualSaslInitialResponse = output.readByteArray(output.availableForRead)
         assertContentEquals(expectedSaslInitialResponse, actualSaslInitialResponse)
 
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONSASLCONTINUE
         val authRequestSaslContinue = """
             R[0000005c][0000000b]
             r=Zr_UEQW:@]US$3;>;OWTSOJFVt7fBPDMwIckFZhqWGSWllyY,
@@ -82,6 +86,7 @@ class StartupAuthHandlerTest {
         input.writeByteArray(authRequestSaslContinue)
 
         yield()
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-SASLRESPONSE
         val expectedSaslResponse = """
             p[0000006c]
             c=biws,r=Zr_UEQW:@]US$3;>;OWTSOJFVt7fBPDMwIckFZhqWGSWllyY,
@@ -90,14 +95,17 @@ class StartupAuthHandlerTest {
         val actualSaslResponse = output.readByteArray(output.availableForRead)
         assertContentEquals(expectedSaslResponse, actualSaslResponse)
 
-        val authRequestSaslComplete = """
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONSASLFINAL
+        val authRequestSaslFinal = """
             R[00000036][0000000c]v=IpT7VwZ1dlYdlXrfOKJUdS+VVTz+8/Oark1phDOpQFQ=
             """.mixedHexToByteArray()
-        input.writeByteArray(authRequestSaslComplete)
+        input.writeByteArray(authRequestSaslFinal)
 
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONOK
         val authRequestSuccess = "R[00000008][00000000]".mixedHexToByteArray()
         input.writeByteArray(authRequestSuccess)
 
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-READYFORQUERY
         val readyForQuery = "Z[00000005]I".mixedHexToByteArray()
         input.writeByteArray(readyForQuery)
 
@@ -106,24 +114,28 @@ class StartupAuthHandlerTest {
 
     @Timeout(1)
     @Test
-    fun testSuccessfulMd5Authentication() = runBlocking {
+    fun testMd5Authentication() = runBlocking {
         val job = launch {
             StartupAuthHandler(input, output, props).authenticate()
         }
 
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONMD5PASSWORD
         val authenticationMD5Password = "R[0000000c][00000005][34ac9b4f]".mixedHexToByteArray()
         input.writeByteArray(authenticationMD5Password)
 
         yield()
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-PASSWORDMESSAGE
         val expectedPasswordMessage = """
             p[00000028]md5d0083471c712392fd3ba76ada9f85d3c[00]
             """.mixedHexToByteArray()
         val actualPasswordMessage = output.readByteArray(output.availableForRead)
         assertContentEquals(expectedPasswordMessage, actualPasswordMessage)
 
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONOK
         val authRequestSuccess = "R[00000008][00000000]".mixedHexToByteArray()
         input.writeByteArray(authRequestSuccess)
 
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-READYFORQUERY
         val readyForQuery = "Z[00000005]I".mixedHexToByteArray()
         input.writeByteArray(readyForQuery)
 
@@ -138,6 +150,7 @@ class StartupAuthHandlerTest {
                 StartupAuthHandler(input, output, props).authenticate()
             }
         }
+        // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-ERRORRESPONSE
         val errorResponse = """
             E[00000069]SFATAL[00]VFATAL[00]C28P01[00]
             Mpassword authentication failed for user "test-user"[00]
