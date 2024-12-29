@@ -58,6 +58,7 @@ class StartupAuthHandlerTest {
             .password(props.password.toCharArray())
             .nonceSupplier { "Zr_UEQW:@]US$3;>;OWTSOJF" }
             .build()
+
         val job = launch {
             StartupAuthHandler(input, output, props, scramClient).authenticate()
         }
@@ -93,6 +94,32 @@ class StartupAuthHandlerTest {
             R[00000036][0000000c]v=IpT7VwZ1dlYdlXrfOKJUdS+VVTz+8/Oark1phDOpQFQ=
             """.mixedHexToByteArray()
         input.writeByteArray(authRequestSaslComplete)
+
+        val authRequestSuccess = "R[00000008][00000000]".mixedHexToByteArray()
+        input.writeByteArray(authRequestSuccess)
+
+        val readyForQuery = "Z[00000005]I".mixedHexToByteArray()
+        input.writeByteArray(readyForQuery)
+
+        job.join()
+    }
+
+    @Timeout(1)
+    @Test
+    fun testSuccessfulMd5Authentication() = runBlocking {
+        val job = launch {
+            StartupAuthHandler(input, output, props).authenticate()
+        }
+
+        val authenticationMD5Password = "R[0000000c][00000005][34ac9b4f]".mixedHexToByteArray()
+        input.writeByteArray(authenticationMD5Password)
+
+        yield()
+        val expectedPasswordMessage = """
+            p[00000028]md5d0083471c712392fd3ba76ada9f85d3c[00]
+            """.mixedHexToByteArray()
+        val actualPasswordMessage = output.readByteArray(output.availableForRead)
+        assertContentEquals(expectedPasswordMessage, actualPasswordMessage)
 
         val authRequestSuccess = "R[00000008][00000000]".mixedHexToByteArray()
         input.writeByteArray(authRequestSuccess)
