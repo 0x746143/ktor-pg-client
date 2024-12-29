@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.x746143
+package com.github.x746143.ktorpgclient
 
-import com.github.x746143.wire3.StartupAuthHandler
+import com.github.x746143.ktorpgclient.wire3.StartupAuthHandler
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import kotlinx.coroutines.Dispatchers

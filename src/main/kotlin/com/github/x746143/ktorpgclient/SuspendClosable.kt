@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.x746143
+package com.github.x746143.ktorpgclient
 
 interface SuspendCloseable {
     suspend fun close()

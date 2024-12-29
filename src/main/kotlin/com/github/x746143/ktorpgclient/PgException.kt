@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.x746143
+package com.github.x746143.ktorpgclient
 
 class PgException(message: String, val severity: String? = null, val code: String? = null) : Exception() {
     private val _message = message

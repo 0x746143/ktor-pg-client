@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.x746143
+package com.github.x746143.ktorpgclient
 
 class Row(private val values: Array<Any>) {
     fun getString(index: Int): String {

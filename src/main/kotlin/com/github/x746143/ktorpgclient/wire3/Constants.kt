@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 @file:Suppress("unused")
 
-package com.github.x746143.wire3
+package com.github.x746143.ktorpgclient.wire3
 
 // https://www.postgresql.org/docs/16/protocol-message-formats.html
 internal object BackendMessage {

@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.x746143.integration
+package com.github.x746143.ktorpgclient.integration
 
-import com.github.x746143.PgClient
-import com.github.x746143.PgException
-import com.github.x746143.PgProperties
+import com.github.x746143.ktorpgclient.PgClient
+import com.github.x746143.ktorpgclient.PgException
+import com.github.x746143.ktorpgclient.PgProperties
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 import org.testcontainers.containers.PostgreSQLContainer

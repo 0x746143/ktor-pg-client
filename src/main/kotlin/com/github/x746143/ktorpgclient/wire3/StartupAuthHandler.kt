@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.x746143.wire3
+package com.github.x746143.ktorpgclient.wire3
 
-import com.github.x746143.PgAuthProperties
-import com.github.x746143.PgException
+import com.github.x746143.ktorpgclient.PgAuthProperties
+import com.github.x746143.ktorpgclient.PgException
 import com.ongres.scram.client.ScramClient
 import io.ktor.utils.io.*
 import kotlinx.io.Source
