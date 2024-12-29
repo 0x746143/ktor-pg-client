@@ -16,14 +16,18 @@
 package com.github.x746143.wire3
 
 import com.github.x746143.PgAuthProperties
+import com.github.x746143.PgException
 import com.ongres.scram.client.ScramClient
 import io.ktor.utils.io.*
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import kotlin.test.assertTrue
 
 class StartupAuthHandlerTest {
 
@@ -124,5 +128,34 @@ class StartupAuthHandlerTest {
         input.writeByteArray(readyForQuery)
 
         job.join()
+    }
+
+    @Test
+    fun testFailedAuthentication() = runBlocking {
+        val input = ByteChannel(autoFlush = true)
+        val output = ByteChannel(autoFlush = true)
+
+        val props = object : PgAuthProperties {
+            override val database = "test"
+            override val username = "test"
+            override val password = "test"
+            override val appName = "test-app"
+        }
+
+        val errorResponse = """
+            E[00000064]SFATAL[00]VFATAL[00]C28P01[00]
+            Mpassword authentication failed for user "test"[00]
+            Fauth.c[00]L323[00]Rauth_failed[00][00]
+            """.mixedHexToByteArray()
+        input.writeByteArray(errorResponse)
+
+        val ex = assertThrows<PgException> {
+            StartupAuthHandler(input, output, props).authenticate()
+        }
+        kotlin.test.assertEquals("FATAL", ex.severity)
+        kotlin.test.assertEquals("28P01", ex.code)
+        assertTrue("'message' does not contain 'password authentication failed'") {
+            ex.message.contains("password authentication failed")
+        }
     }
 }
