@@ -19,7 +19,6 @@ import com.github.x746143.PgAuthProperties
 import com.github.x746143.PgException
 import com.ongres.scram.client.ScramClient
 import io.ktor.utils.io.*
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
@@ -34,12 +33,8 @@ class StartupAuthHandlerTest {
     @Test
     fun testStartupMessage() = runBlocking {
         val output = ByteChannel()
-        val props = object : PgAuthProperties {
-            override val database = "dbname"
-            override val username = "username"
-            override val password = "password"
-            override val appName = "test-app"
-        }
+        val props = TestPgAuthProperties("dbname", "username", "password", "test-app")
+
         StartupAuthHandler(ByteChannel(), output, props).sendStartupMessage()
         output.close()
         val expected = """
@@ -57,6 +52,7 @@ class StartupAuthHandlerTest {
     fun testSuccessfulSaslAuthentication() = runBlocking {
         val input = ByteChannel(autoFlush = true)
         val output = ByteChannel(autoFlush = true)
+        val props = TestPgAuthProperties("postgres", "postgres", "postgres", "test-app")
 
         val scramClient = ScramClient.builder()
             .advertisedMechanisms(listOf("SCRAM-SHA-256", "SCRAM-SHA-256-PLUS"))
@@ -64,13 +60,6 @@ class StartupAuthHandlerTest {
             .password("postgres".toCharArray())
             .nonceSupplier { "\$>n-:R]0GY^zP>f_D;L@1'Wg" }
             .build()
-
-        val props = object : PgAuthProperties {
-            override val database = "postgres"
-            override val username = "postgres"
-            override val password = "postgres"
-            override val appName = ""
-        }
 
         val job = launch {
             StartupAuthHandler(input, output, props, scramClient).authenticate()
@@ -134,13 +123,7 @@ class StartupAuthHandlerTest {
     fun testFailedAuthentication() = runBlocking {
         val input = ByteChannel(autoFlush = true)
         val output = ByteChannel(autoFlush = true)
-
-        val props = object : PgAuthProperties {
-            override val database = "test"
-            override val username = "test"
-            override val password = "test"
-            override val appName = "test-app"
-        }
+        val props = TestPgAuthProperties("test", "test", "test", "test-app")
 
         val errorResponse = """
             E[00000064]SFATAL[00]VFATAL[00]C28P01[00]
@@ -158,4 +141,11 @@ class StartupAuthHandlerTest {
             ex.message.contains("password authentication failed")
         }
     }
+
+    private class TestPgAuthProperties(
+        override val database: String,
+        override val username: String,
+        override val password: String,
+        override val appName: String
+    ) : PgAuthProperties
 }
