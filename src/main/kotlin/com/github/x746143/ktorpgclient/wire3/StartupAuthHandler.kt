@@ -20,8 +20,10 @@ import com.github.x746143.ktorpgclient.PgException
 import com.ongres.scram.client.ScramClient
 import io.ktor.utils.io.*
 import kotlinx.io.Source
+import kotlinx.io.readByteArray
 import kotlinx.io.readString
 import kotlinx.io.writeString
+import java.security.MessageDigest
 
 // https://www.postgresql.org/docs/16/protocol-flow.html#PROTOCOL-FLOW-START-UP
 internal class StartupAuthHandler(
@@ -74,7 +76,7 @@ internal class StartupAuthHandler(
             val messageLength = input.readInt()
             val source = input.readPacket(messageLength - 4)
             when (messageType) {
-                BackendMessage.AUTHENTICATION -> authenticateScram(source)
+                BackendMessage.AUTHENTICATION -> authenticate(source)
                 // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-PARAMETERSTATUS
                 BackendMessage.PARAMETER_STATUS -> {} // TODO: handling
                 // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-BACKENDKEYDATA
@@ -101,7 +103,7 @@ internal class StartupAuthHandler(
         }
     }
 
-    private suspend fun authenticateScram(source: Source) {
+    private suspend fun authenticate(source: Source) {
         when (val authDataType = source.readInt()) {
             // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONSASL
             // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-SASLINITIALRESPONSE
@@ -121,9 +123,22 @@ internal class StartupAuthHandler(
             }
             // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONSASLFINAL
             Authentication.SASL_FINAL -> scramClient.serverFinalMessage(source.readString())
+            // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONMD5PASSWORD
+            Authentication.MD5_PASSWORD -> output.writePgMessage(FrontendMessage.PASSWORD_MESSAGE) {
+                writeCString(md5Hash(source.readByteArray(4)))
+            }
             // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONOK
             Authentication.OK -> {} // TODO: handling
             else -> throw PgException("Unsupported authentication data type: $authDataType")
         }
+    }
+
+    @OptIn(ExperimentalStdlibApi::class)
+    private fun md5Hash(salt: ByteArray) = with(MessageDigest.getInstance("MD5")) {
+        update(props.password.encodeToByteArray())
+        update(props.username.encodeToByteArray())
+        update(digest().toHexString().toByteArray())
+        update(salt)
+        "md5" + digest().toHexString()
     }
 }
