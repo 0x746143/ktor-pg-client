@@ -21,7 +21,6 @@ import com.github.x746143.ktorpgclient.PgProperties
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 import org.testcontainers.containers.PostgreSQLContainer
-import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
 import kotlin.test.*
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
@@ -30,20 +29,24 @@ import kotlin.time.Duration.Companion.seconds
 class AuthenticationTest {
 
     private val postgres = PostgreSQLContainer("postgres:16")
+        .withUsername("test-user")
+        .withPassword("test-password")
     private lateinit var props: PgProperties
 
     @BeforeAll
     fun setUp() {
         postgres.start()
-        props = PgProperties(
-            port = postgres.getMappedPort(POSTGRESQL_PORT),
-            username = postgres.username,
-            password = postgres.password,
-            database = postgres.databaseName,
-            minPoolSize = 1,
-            maxPoolSize = 1,
-            timeout = 1.seconds
-        )
+        props = with(postgres) {
+            PgProperties(
+                port = firstMappedPort,
+                username = username,
+                password = password,
+                database = databaseName,
+                minPoolSize = 1,
+                maxPoolSize = 1,
+                timeout = 1.seconds
+            )
+        }
     }
 
     @AfterAll

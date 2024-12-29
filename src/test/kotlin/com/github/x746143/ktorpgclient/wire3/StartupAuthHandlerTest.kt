@@ -31,7 +31,7 @@ class StartupAuthHandlerTest {
 
     private var input = ByteChannel(autoFlush = true)
     private var output = ByteChannel(autoFlush = true)
-    private var props = TestPgAuthProperties("dbname", "username", "password", "test-app")
+    private var props = TestPgAuthProperties("test-user", "test-password", "test-db", "test-app")
 
     @Timeout(1)
     @Test
@@ -39,9 +39,9 @@ class StartupAuthHandlerTest {
         StartupAuthHandler(input, output, props).sendStartupMessage()
         output.close()
         val expected = """
-            [00000064][00030000]
-            user[00]username[00]
-            database[00]dbname[00]
+            [00000066][00030000]
+            user[00]test-user[00]
+            database[00]test-db[00]
             application_name[00]test-app[00]
             client_encoding[00]utf8[00]
             DateStyle[00]ISO[00][00]
@@ -54,11 +54,10 @@ class StartupAuthHandlerTest {
     fun testSuccessfulSaslAuthentication() = runBlocking {
         val scramClient = ScramClient.builder()
             .advertisedMechanisms(listOf("SCRAM-SHA-256", "SCRAM-SHA-256-PLUS"))
-            .username("postgres")
-            .password("postgres".toCharArray())
-            .nonceSupplier { "$>n-:R]0GY^zP>f_D;L@1'Wg" }
+            .username(props.username)
+            .password(props.password.toCharArray())
+            .nonceSupplier { "Zr_UEQW:@]US$3;>;OWTSOJF" }
             .build()
-
         val job = launch {
             StartupAuthHandler(input, output, props, scramClient).authenticate()
         }
@@ -68,30 +67,30 @@ class StartupAuthHandlerTest {
 
         yield()
         val expectedSaslInitialResponse = """
-            p[0000003e]SCRAM-SHA-256[00][00000028]
-            n,,n=postgres,r=$>n-:R]0GY^zP>f_D;L@1'Wg
+            p[0000003f]SCRAM-SHA-256[00][00000029]
+            n,,n=test-user,r=Zr_UEQW:@]US$3;>;OWTSOJF
             """.mixedHexToByteArray()
         val actualSaslInitialResponse = output.readByteArray(output.availableForRead)
         assertContentEquals(expectedSaslInitialResponse, actualSaslInitialResponse)
 
         val authRequestSaslContinue = """
             R[0000005c][0000000b]
-            r=$>n-:R]0GY^zP>f_D;L@1'WgMQsJvP3m/8sjtDu/IEq5aBdh,
-            s=IRBTHxuXNWaXk2tAFLEntw==,i=4096
+            r=Zr_UEQW:@]US$3;>;OWTSOJFVt7fBPDMwIckFZhqWGSWllyY,
+            s=rD4Klg5kIRdD9Lmh0WIhfA==,i=4096
             """.mixedHexToByteArray()
         input.writeByteArray(authRequestSaslContinue)
 
         yield()
         val expectedSaslResponse = """
             p[0000006c]
-            c=biws,r=$>n-:R]0GY^zP>f_D;L@1'WgMQsJvP3m/8sjtDu/IEq5aBdh,
-            p=9bWnsvghpNuaxrU62Nj5TW+TtpdwWGM/416H5J8QYRU=
+            c=biws,r=Zr_UEQW:@]US$3;>;OWTSOJFVt7fBPDMwIckFZhqWGSWllyY,
+            p=vgKpQ5YXjKrIcvyuopH/bp+7Rhp5we1poCyKkIMyrpI=
             """.mixedHexToByteArray()
         val actualSaslResponse = output.readByteArray(output.availableForRead)
         assertContentEquals(expectedSaslResponse, actualSaslResponse)
 
         val authRequestSaslComplete = """
-            R[00000036][0000000c]v=tC69GfdeTdUW0i7yVSWyDwM+gCJQ0bNovqVJPRrQXPs=
+            R[00000036][0000000c]v=IpT7VwZ1dlYdlXrfOKJUdS+VVTz+8/Oark1phDOpQFQ=
             """.mixedHexToByteArray()
         input.writeByteArray(authRequestSaslComplete)
 
@@ -113,8 +112,8 @@ class StartupAuthHandlerTest {
             }
         }
         val errorResponse = """
-            E[00000064]SFATAL[00]VFATAL[00]C28P01[00]
-            Mpassword authentication failed for user "test"[00]
+            E[00000069]SFATAL[00]VFATAL[00]C28P01[00]
+            Mpassword authentication failed for user "test-user"[00]
             Fauth.c[00]L323[00]Rauth_failed[00][00]
             """.mixedHexToByteArray()
         input.writeByteArray(errorResponse)
@@ -126,9 +125,9 @@ class StartupAuthHandlerTest {
     }
 
     private class TestPgAuthProperties(
-        override val database: String,
         override val username: String,
         override val password: String,
+        override val database: String,
         override val appName: String
     ) : PgAuthProperties
 }

@@ -31,8 +31,8 @@ data class PgProperties(
 ) : PgAuthProperties
 
 internal interface PgAuthProperties {
-    val database: String
     val username: String
     val password: String
+    val database: String
     val appName: String
 }
