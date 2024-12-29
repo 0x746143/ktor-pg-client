@@ -41,18 +41,18 @@ class PgClient(private val props: PgProperties) : PgConnection {
         }
     }
 
-    private suspend fun createConnection(): PgConnectionImpl {
+    private suspend fun createConnection() = withTimeout(props.timeout) {
         val connection = socketBuilder.connect(props.host, props.port).connection()
         with(StartupAuthHandler(connection.input, connection.output, props)) {
             sendStartupMessage()
             authenticate()
         }
-        return PgConnectionImpl(connection.input, connection.output) {
+        PgConnectionImpl(connection.input, connection.output) {
             releaseConnection(it)
         }
     }
 
-    private suspend inline fun acquireConnection(): PgConnectionImpl = withTimeout(props.timeout) {
+    private suspend inline fun acquireConnection() = withTimeout(props.timeout) {
         connectionPool.tryReceive().getOrElse {
             mutex.withLock {
                 if (connectionCounter < props.maxPoolSize) {

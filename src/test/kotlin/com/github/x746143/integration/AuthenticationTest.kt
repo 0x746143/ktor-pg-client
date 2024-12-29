@@ -19,13 +19,12 @@ import com.github.x746143.PgClient
 import com.github.x746143.PgException
 import com.github.x746143.PgProperties
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.TestInstance
-import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.*
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
 import kotlin.test.*
+import kotlin.test.Test
+import kotlin.time.Duration.Companion.seconds
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AuthenticationTest {
@@ -42,7 +41,8 @@ class AuthenticationTest {
             password = postgres.password,
             database = postgres.databaseName,
             minPoolSize = 1,
-            maxPoolSize = 1
+            maxPoolSize = 1,
+            timeout = 1.seconds
         )
     }
 
@@ -51,6 +51,7 @@ class AuthenticationTest {
         postgres.stop()
     }
 
+    @Timeout(1)
     @Test
     fun testSuccessfulAuthentication() = runBlocking {
         val pgClient = PgClient(props)
@@ -58,6 +59,7 @@ class AuthenticationTest {
         assertEquals(1, pgClient.connectionCounter)
     }
 
+    @Timeout(1)
     @Test
     fun testFailedAuthentication() = runBlocking {
         val ex = assertThrows<PgException> {
