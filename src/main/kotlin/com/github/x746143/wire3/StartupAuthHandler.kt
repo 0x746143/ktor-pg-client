@@ -50,17 +50,6 @@ internal class StartupAuthHandler(
         private val dateStyleValue = "ISO".toByteArray()
         // TODO: Add more parameters
 
-        private const val AUTHENTICATION_TYPE = 'R'.code.toByte()
-        private const val PARAMETER_STATUS_TYPE = 'S'.code.toByte()
-        private const val BACKEND_KEY_DATA_TYPE = 'K'.code.toByte()
-        private const val READY_FOR_QUERY_TYPE = 'Z'.code.toByte()
-        private const val SASL_RESPONSE_TYPE = 'p'.code.toByte()
-        private const val ERROR_RESPONSE_TYPE = 'E'.code.toByte()
-        private const val ZERO = 0.toByte()
-        private const val MESSAGE_ERROR_TYPE = 'M'.code.toByte()
-        private const val CODE_ERROR_TYPE = 'C'.code.toByte()
-        private const val SEVERITY_ERROR_TYPE = 'S'.code.toByte()
-
         val scramMechanisms = listOf("SCRAM-SHA-256", "SCRAM-SHA-256-PLUS")
         private val scramSha256 = scramMechanisms[0].toByteArray()
     }
@@ -68,7 +57,7 @@ internal class StartupAuthHandler(
     // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-STARTUPMESSAGE
     suspend fun sendStartupMessage() {
         output.writePgMessage {
-            writeInt(0x00030000) // The protocol version 3.0
+            writeInt(MessageCode.PROTOCOL_VERSION)
             writeList {
                 param(userParam, props.username)
                 param(databaseParam, props.database)
@@ -85,25 +74,28 @@ internal class StartupAuthHandler(
             val messageLength = input.readInt()
             val source = input.readPacket(messageLength - 4)
             when (messageType) {
-                AUTHENTICATION_TYPE -> authenticateScram(source)
+                BackendMessage.AUTHENTICATION -> authenticateScram(source)
                 // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-PARAMETERSTATUS
-                PARAMETER_STATUS_TYPE -> {} // TODO: handling
+                BackendMessage.PARAMETER_STATUS -> {} // TODO: handling
                 // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-BACKENDKEYDATA
-                BACKEND_KEY_DATA_TYPE -> {} // TODO: handling
+                BackendMessage.BACKEND_KEY_DATA -> {} // TODO: handling
                 // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-ERRORRESPONSE
-                ERROR_RESPONSE_TYPE -> {
+                BackendMessage.ERROR_RESPONSE -> {
                     generateSequence {
-                        source.readByte().let { if (it == ZERO) null else it to source.readCString() }
+                        source.readByte().toInt().let { fieldType ->
+                            if (fieldType == 0) null
+                            else fieldType to source.readCString()
+                        }
                     }.toMap().let { fields ->
                         throw PgException(
-                            fields[MESSAGE_ERROR_TYPE] ?: "Unknown error",
-                            fields[SEVERITY_ERROR_TYPE],
-                            fields[CODE_ERROR_TYPE],
+                            fields[ErrorField.MESSAGE] ?: "Unknown error",
+                            fields[ErrorField.SEVERITY],
+                            fields[ErrorField.CODE],
                         )
                     }
                 }
                 // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-READYFORQUERY
-                READY_FOR_QUERY_TYPE -> return
+                BackendMessage.READY_FOR_QUERY -> return
                 else -> throw PgException("Unsupported message type: ${messageType.toInt().toChar()}")
             }
         }
@@ -111,11 +103,9 @@ internal class StartupAuthHandler(
 
     private suspend fun authenticateScram(source: Source) {
         when (val authDataType = source.readInt()) {
-            // Backend: AuthenticationSASL
             // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONSASL
-            // Frontend: SASLInitialResponse
             // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-SASLINITIALRESPONSE
-            10 -> output.writePgMessage(SASL_RESPONSE_TYPE) {
+            Authentication.SASL -> output.writePgMessage(FrontendMessage.SASL_INITIAL_RESPONSE) {
                 writeCString(scramSha256)
                 scramClient.clientFirstMessage()
                     .toString()
@@ -123,24 +113,16 @@ internal class StartupAuthHandler(
                     .also { writeInt(it.size) }
                     .also { write(it) }
             }
-
-            // Backend: AuthenticationSASLContinue
             // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONSASLCONTINUE
-            // Frontend: SASLResponse
             // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-SASLRESPONSE
-            11 -> output.writePgMessage(SASL_RESPONSE_TYPE) {
+            Authentication.SASL_CONTINUE -> output.writePgMessage(FrontendMessage.SASL_RESPONSE) {
                 scramClient.serverFirstMessage(source.readString())
                 writeString(scramClient.clientFinalMessage().toString())
             }
-
-            // Backend: AuthenticationSASLFinal
             // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONSASLFINAL
-            12 -> scramClient.serverFinalMessage(source.readString())
-
-            // Backend: AuthenticationOk
+            Authentication.SASL_FINAL -> scramClient.serverFinalMessage(source.readString())
             // https://www.postgresql.org/docs/16/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-AUTHENTICATIONOK
-            0 -> {} // TODO: handling
-
+            Authentication.OK -> {} // TODO: handling
             else -> throw PgException("Unsupported authentication data type: $authDataType")
         }
     }
