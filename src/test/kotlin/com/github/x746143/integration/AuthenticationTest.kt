@@ -50,14 +50,14 @@ class AuthenticationTest {
     }
 
     @Test
-    fun successfulAuthTest() = runBlocking {
+    fun testSuccessfulAuthentication() = runBlocking {
         val pgClient = PgClient(props)
         pgClient.initPool()
         assertEquals(1, pgClient.connectionCounter)
     }
 
     @Test
-    fun failedAuthTest() = runBlocking {
+    fun testFailedAuthentication() = runBlocking {
         val ex = assertThrows<PgException> {
             PgClient(props.copy(password = "incorrect_password")).initPool()
         }
