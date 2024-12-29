@@ -19,11 +19,13 @@ import com.github.x746143.PgClient
 import com.github.x746143.PgException
 import com.github.x746143.PgProperties
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.*
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.assertThrows
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AuthenticationTest {
@@ -46,7 +48,7 @@ class AuthenticationTest {
 
     @AfterAll
     fun tearDown() {
-        postgres.stop();
+        postgres.stop()
     }
 
     @Test
@@ -63,8 +65,6 @@ class AuthenticationTest {
         }
         assertEquals("FATAL", ex.severity)
         assertEquals("28P01", ex.code)
-        assertTrue("'message' does not contain 'password authentication failed'") {
-            ex.message.contains("password authentication failed")
-        }
+        assertContains(ex.message, "password authentication failed")
     }
 }

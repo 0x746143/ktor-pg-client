@@ -19,7 +19,7 @@ import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 
 fun String.mixedHexToByteArray(): ByteArray {
-    val str = trimIndent().replace("\n","")
+    val str = trimIndent().replace("\n", "")
     val buffer = Buffer()
     var hexMode = false
     var i = 0
@@ -28,9 +28,13 @@ fun String.mixedHexToByteArray(): ByteArray {
         if (ch > '~') {
             throw IllegalArgumentException("Invalid character $str at index $i")
         }
-        when (ch) {
-            '[' -> { hexMode = true; continue }
-            ']' -> { hexMode = false; continue }
+        if (ch == '[' && !hexMode) {
+            hexMode = true
+            continue
+        }
+        if (ch == ']' && hexMode) {
+            hexMode = false
+            continue
         }
         if (hexMode) {
             val highNibble = ch.hexToInt(i) shl 4

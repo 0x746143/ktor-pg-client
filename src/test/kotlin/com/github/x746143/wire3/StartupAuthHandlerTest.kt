@@ -19,23 +19,24 @@ import com.github.x746143.PgAuthProperties
 import com.github.x746143.PgException
 import com.ongres.scram.client.ScramClient
 import io.ktor.utils.io.*
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
-import org.junit.jupiter.api.Assertions.assertArrayEquals
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.assertThrows
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class StartupAuthHandlerTest {
 
+    private var input = ByteChannel(autoFlush = true)
+    private var output = ByteChannel(autoFlush = true)
+    private var props = TestPgAuthProperties("dbname", "username", "password", "test-app")
+
+    @Timeout(1)
     @Test
     fun testStartupMessage() = runBlocking {
-        val output = ByteChannel()
-        val props = TestPgAuthProperties("dbname", "username", "password", "test-app")
-
-        StartupAuthHandler(ByteChannel(), output, props).sendStartupMessage()
+        StartupAuthHandler(input, output, props).sendStartupMessage()
         output.close()
         val expected = """
             [00000064][00030000]
@@ -45,72 +46,56 @@ class StartupAuthHandlerTest {
             client_encoding[00]utf8[00]
             DateStyle[00]ISO[00][00]
             """.mixedHexToByteArray()
-        assertArrayEquals(expected, output.toByteArray())
+        assertContentEquals(expected, output.toByteArray())
     }
 
+    @Timeout(1)
     @Test
     fun testSuccessfulSaslAuthentication() = runBlocking {
-        val input = ByteChannel(autoFlush = true)
-        val output = ByteChannel(autoFlush = true)
-        val props = TestPgAuthProperties("postgres", "postgres", "postgres", "test-app")
-
         val scramClient = ScramClient.builder()
             .advertisedMechanisms(listOf("SCRAM-SHA-256", "SCRAM-SHA-256-PLUS"))
             .username("postgres")
             .password("postgres".toCharArray())
-            .nonceSupplier { "\$>n-:R]0GY^zP>f_D;L@1'Wg" }
+            .nonceSupplier { "$>n-:R]0GY^zP>f_D;L@1'Wg" }
             .build()
 
         val job = launch {
             StartupAuthHandler(input, output, props, scramClient).authenticate()
         }
 
-        val authRequestSasl = """
-            R[00000017][0000000a]
-            SCRAM-SHA-256[00][00]
-            """.mixedHexToByteArray()
+        val authRequestSasl = "R[00000017][0000000a]SCRAM-SHA-256[00][00]".mixedHexToByteArray()
         input.writeByteArray(authRequestSasl)
 
         yield()
         val expectedSaslInitialResponse = """
             p[0000003e]SCRAM-SHA-256[00][00000028]
-            [6e2c2c6e3d706f7374677265732c723d243e6e2d
-            3a525d3047595e7a503e665f443b4c4031275767]
+            n,,n=postgres,r=$>n-:R]0GY^zP>f_D;L@1'Wg
             """.mixedHexToByteArray()
-        assertEquals(63, output.availableForRead)
         val actualSaslInitialResponse = output.readByteArray(output.availableForRead)
-        assertArrayEquals(expectedSaslInitialResponse, actualSaslInitialResponse)
+        assertContentEquals(expectedSaslInitialResponse, actualSaslInitialResponse)
 
         val authRequestSaslContinue = """
             R[0000005c][0000000b]
-            [723d243e6e2d3a525d3047595e7a503e665f443b4c40312757674d51
-            734a7650336d2f38736a7444752f49457135614264682c733d495242
-            54487875584e5761586b327441464c456e74773d3d2c693d34303936]
+            r=$>n-:R]0GY^zP>f_D;L@1'WgMQsJvP3m/8sjtDu/IEq5aBdh,
+            s=IRBTHxuXNWaXk2tAFLEntw==,i=4096
             """.mixedHexToByteArray()
         input.writeByteArray(authRequestSaslContinue)
 
         yield()
         val expectedSaslResponse = """
             p[0000006c]
-            [633d626977732c723d243e6e2d3a525d3047595e7a503e665f44
-            3b4c40312757674d51734a7650336d2f38736a7444752f494571
-            35614264682c703d3962576e73766768704e756178725536324e
-            6a3554572b547470647757474d2f34313648354a38515952553d]
+            c=biws,r=$>n-:R]0GY^zP>f_D;L@1'WgMQsJvP3m/8sjtDu/IEq5aBdh,
+            p=9bWnsvghpNuaxrU62Nj5TW+TtpdwWGM/416H5J8QYRU=
             """.mixedHexToByteArray()
-        assertEquals(109, output.availableForRead)
         val actualSaslResponse = output.readByteArray(output.availableForRead)
-        assertArrayEquals(expectedSaslResponse, actualSaslResponse)
+        assertContentEquals(expectedSaslResponse, actualSaslResponse)
 
         val authRequestSaslComplete = """
-            R[00000036][0000000c]
-            [763d744336394766646554645557306937795653577944
-            774d2b67434a5130624e6f7671564a505272515850733d]
+            R[00000036][0000000c]v=tC69GfdeTdUW0i7yVSWyDwM+gCJQ0bNovqVJPRrQXPs=
             """.mixedHexToByteArray()
         input.writeByteArray(authRequestSaslComplete)
 
-        val authRequestSuccess = """
-            R[00000008][00000000]
-        """.mixedHexToByteArray()
+        val authRequestSuccess = "R[00000008][00000000]".mixedHexToByteArray()
         input.writeByteArray(authRequestSuccess)
 
         val readyForQuery = "Z[00000005]I".mixedHexToByteArray()
@@ -119,12 +104,14 @@ class StartupAuthHandlerTest {
         job.join()
     }
 
+    @Timeout(1)
     @Test
     fun testFailedAuthentication() = runBlocking {
-        val input = ByteChannel(autoFlush = true)
-        val output = ByteChannel(autoFlush = true)
-        val props = TestPgAuthProperties("test", "test", "test", "test-app")
-
+        val deferredException = async {
+            assertThrows<PgException> {
+                StartupAuthHandler(input, output, props).authenticate()
+            }
+        }
         val errorResponse = """
             E[00000064]SFATAL[00]VFATAL[00]C28P01[00]
             Mpassword authentication failed for user "test"[00]
@@ -132,14 +119,10 @@ class StartupAuthHandlerTest {
             """.mixedHexToByteArray()
         input.writeByteArray(errorResponse)
 
-        val ex = assertThrows<PgException> {
-            StartupAuthHandler(input, output, props).authenticate()
-        }
-        kotlin.test.assertEquals("FATAL", ex.severity)
-        kotlin.test.assertEquals("28P01", ex.code)
-        assertTrue("'message' does not contain 'password authentication failed'") {
-            ex.message.contains("password authentication failed")
-        }
+        val ex = deferredException.await()
+        assertEquals("FATAL", ex.severity)
+        assertEquals("28P01", ex.code)
+        assertContains(ex.message, "password authentication failed")
     }
 
     private class TestPgAuthProperties(
